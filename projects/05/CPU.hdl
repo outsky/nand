@@ -48,16 +48,55 @@ CHIP CPU {
 	And(a = bC, b = instruction[4], out = bDestD);
 	And(a = bC, b = instruction[5], out = bDestA);
 	Or(a = bA, b = bDestA, out = bLoadA);
-    Mux16(a[0..14] = instruction[0..14], b = outM, sel = instruction[15], out = M1);
-	Register(in = M1, load = bLoadA, out = A, out = addressM);	// A register
-	Register(in = outM, load = bDestD, out = D);	// D register
+    Mux16(a[0..14] = instruction[0..14], b = oM, sel = instruction[15], out = M1);
+	ARegister(in = M1, load = bLoadA, out = A, out[0..14] = addressM);
+	DRegister(in = oM, load = bDestD, out = D);
 	Mux16(a = A, b = inM, sel = instruction[12], out = M2);
-	ALU(x = D, y = M2, zx = instruction[11], nx = instruction[10], zy = instruction[9], ny = instruction[8], f = instruction[7], no = instruction[6], out = outM, zr = bZR, ng = bNG);
+	ALU(x = D, y = M2, zx = instruction[11], nx = instruction[10], zy = instruction[9], ny = instruction[8], f = instruction[7], no = instruction[6], out = outM, out = oM, zr = bZR, ng = bNG);
 	
-	And(a = true, b = instruction[0], out = j0);
-	And(a = true, b = instruction[1], out = j1);
-	And(a = true, b = instruction[2], out = j2);
+	DMux8Way(in = true, sel = instruction[0..2], a = nj, b = gt, c = eq, d = ge, e = lt, f = ne, g = le, h = jmp);
 	
+	/*
+	bLoadPC = (!nj && (
+		(gt && !bZR && !bNG) ||
+		(eq && bZR) ||
+		(ge && !bNG) ||
+		(lt && bNG) ||
+		(ne && !bZR) ||
+		(le && (bZR || bNG))
+	)) || jmp
+	*/
 	
-	PC(in = A, load = bLoadPC, inc = true, reset = reset, out = pc);
+	Not(in = bZR, out = bNZR);
+	Not(in = bNG, out = bNNG);
+	
+	And(a = gt, b = bNZR, out = b0);
+	And(a = b0, b = bNNG, out = b1);	// (gt && !bZR && !bNG)
+	
+	And(a = eq, b = bZR, out = b2);		// (eq && bZR)
+	
+	And(a = ge, b = bNNG, out = b3);	// (ge && !bNG)
+	
+	And(a = lt, b = bNG, out = b4);		// (lt && bNG)
+	
+	And(a = ne, b = bNZR, out = b5);	// (ne && !bZR)
+	
+	Or(a = bZR, b = bNG, out = b6);
+	And(a = le, b = b6, out = b7);		// (le && (bZR || bNG)
+	
+	Or(a = b1, b = b2, out = bb1);
+	Or(a = bb1, b = b3, out = bb2);
+	Or(a = bb2, b = b4, out = bb3);
+	Or(a = bb3, b = b5, out = bb4);
+	Or(a = bb4, b = b7, out = bb5);
+	
+	Not(in = nj, out = nnj);
+	
+	And(a = nnj, b = bb5, out = bbb1);
+	
+	Or(a = bbb1, b = jmp, out = bbb2);
+	
+	And(a = bbb2, b = bC, out = bLoadPC);
+	
+	PC(in = A, load = bLoadPC, inc = true, reset = reset, out[0..14] = pc);
 }
