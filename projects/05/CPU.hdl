@@ -23,6 +23,9 @@
  * to their new values only in the next time step. If reset==1 then the 
  * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
  * than to the address resulting from executing the current instruction. 
+ 
+ FED C BA9876 543 210
+ 111 a cccccc ddd jjj
  */
 
 CHIP CPU {
@@ -39,5 +42,22 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+	Not(in = instruction[15], out = bA);	// is A instruction?
+	Not(in = bA, out = bC);	// is C instruction
+	And(a = bC, b = instruction[3], out = writeM);
+	And(a = bC, b = instruction[4], out = bDestD);
+	And(a = bC, b = instruction[5], out = bDestA);
+	Or(a = bA, b = bDestA, out = bLoadA);
+    Mux16(a[0..14] = instruction[0..14], b = outM, sel = instruction[15], out = M1);
+	Register(in = M1, load = bLoadA, out = A, out = addressM);	// A register
+	Register(in = outM, load = bDestD, out = D);	// D register
+	Mux16(a = A, b = inM, sel = instruction[12], out = M2);
+	ALU(x = D, y = M2, zx = instruction[11], nx = instruction[10], zy = instruction[9], ny = instruction[8], f = instruction[7], no = instruction[6], out = outM, zr = bZR, ng = bNG);
+	
+	And(a = true, b = instruction[0], out = j0);
+	And(a = true, b = instruction[1], out = j1);
+	And(a = true, b = instruction[2], out = j2);
+	
+	
+	PC(in = A, load = bLoadPC, inc = true, reset = reset, out = pc);
 }
